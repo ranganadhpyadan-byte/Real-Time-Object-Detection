@@ -167,6 +167,29 @@ RECENT_LOG_LIMIT = int(
 
 PAGE_LAYOUT = "wide"
 
+ICE_SERVERS = [
+    {"urls": ["stun:stun.l.google.com:19302"]},
+]
+TURN_SERVER_URLS = _setting("TURN_SERVER_URLS", "").strip()
+TURN_SERVER_USERNAME = _setting("TURN_SERVER_USERNAME", "").strip()
+TURN_SERVER_CREDENTIAL = _setting("TURN_SERVER_CREDENTIAL", "").strip()
+turn_server_urls = [url.strip() for url in TURN_SERVER_URLS.split(",") if url.strip()]
+if any((TURN_SERVER_URLS, TURN_SERVER_USERNAME, TURN_SERVER_CREDENTIAL)):
+    if not all(
+        (turn_server_urls, TURN_SERVER_USERNAME, TURN_SERVER_CREDENTIAL)
+    ):
+        raise ValueError(
+            "Configure TURN_SERVER_URLS, TURN_SERVER_USERNAME, and "
+            "TURN_SERVER_CREDENTIAL together."
+        )
+    ICE_SERVERS.append(
+        {
+            "urls": turn_server_urls,
+            "username": TURN_SERVER_USERNAME,
+            "credential": TURN_SERVER_CREDENTIAL,
+        }
+    )
+
 
 # =========================================================
 # DETECTION LOGGING COOLDOWN
@@ -184,3 +207,15 @@ LOG_COOLDOWN = float(
         "2.0"
     )
 )
+
+# Keep camera frames flowing while limiting YOLO work on the server.
+INFERENCE_FPS = float(_setting("INFERENCE_FPS", "7"))
+INFERENCE_MAX_SIDE = int(_setting("INFERENCE_MAX_SIDE", "640"))
+INFERENCE_IMAGE_SIZE = int(_setting("INFERENCE_IMAGE_SIZE", "416"))
+
+if not 0 < INFERENCE_FPS <= 10:
+    raise ValueError("INFERENCE_FPS must be greater than 0 and at most 10.")
+if INFERENCE_MAX_SIDE < 1 or INFERENCE_IMAGE_SIZE < 1:
+    raise ValueError("Inference frame dimensions must be positive integers.")
+if not LOG_COOLDOWN >= 1:
+    raise ValueError("LOG_COOLDOWN must be at least 1 second.")

@@ -2,9 +2,15 @@
 # MySQL Database Module
 # Real-Time Object Detection & Logging Platform
 
+import logging
+import queue
+import threading
+
 import mysql.connector
 from mysql.connector import Error
 from config import DB_HOST, DB_NAME, DB_PASSWORD, DB_PORT, DB_USER
+
+logger = logging.getLogger(__name__)
 
 
 class DatabaseManager:
@@ -272,3 +278,47 @@ class DatabaseManager:
         except Error as e:
 
             print(f"Error closing MySQL connection: {e}")
+
+
+class DetectionLogWorker:
+    """Write detection events off the video-processing thread."""
+
+    def __init__(self, database_factory=DatabaseManager, max_pending=100):
+        self._database_factory = database_factory
+        self._events = queue.Queue(maxsize=max_pending)
+        self._thread = threading.Thread(
+            target=self._run,
+            name="detection-log-writer",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def submit(self, detection):
+        event = {
+            "object_class": detection["class"],
+            "confidence": detection["confidence"],
+            "bbox_x": detection["x"],
+            "bbox_y": detection["y"],
+            "bbox_w": detection["w"],
+            "bbox_h": detection["h"],
+        }
+        try:
+            self._events.put_nowait(event)
+        except queue.Full:
+            logger.warning("Detection log queue is full; dropping one event.")
+
+    def _run(self):
+        database = None
+        while True:
+            event = self._events.get()
+            try:
+                if database is None:
+                    database = self._database_factory()
+                database.insert_detection(**event)
+            except Exception:
+                logger.exception("Unable to write a detection event to MySQL.")
+                if database is not None:
+                    database.close()
+                    database = None
+            finally:
+                self._events.task_done()

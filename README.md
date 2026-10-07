@@ -1,108 +1,60 @@
 # Real-Time Object Detection & Logging Platform
 
-An object-detection dashboard built with Python, OpenCV, Ultralytics YOLO, Streamlit, and MySQL. The dashboard streams the user's browser webcam through WebRTC, applies YOLO continuously, draws detections on the live video, and optionally logs detection events to MySQL.
+The Streamlit application uses the visitor's browser webcam through
+`streamlit-webrtc`. It returns a continuous live video stream with YOLO
+annotations; it does not take or upload photos, and the deployed Streamlit
+server does not try to access a webcam with `cv2.VideoCapture(0)`.
 
-## Features
+## Run locally
 
-- Continuous browser webcam video with YOLO detection overlays
-- Adjustable confidence threshold and object-class filter
-- Recent MySQL detection events
-- MySQL logging with bounding-box coordinates
-- Detection continues when MySQL is unavailable; database events are logged when a connection is available
-- Standalone OpenCV window mode (`live_detection.py`) for local desktop use
-
-## Requirements
-
-- Python 3.10 or later
-- A webcam and browser permission for live camera mode
-- MySQL Server for persistent event logging
-
-## Setup on Windows
-
-Open PowerShell in the project directory:
+Use Python 3.10 or newer:
 
 ```powershell
-py -m venv .venv
+python -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install --upgrade pip
-pip install -r requirements.txt
+python -m pip install -r requirements.txt
 Copy-Item .env.example .env
+streamlit run main.py
 ```
 
-Edit `.env` with your local MySQL connection settings. Do not commit `.env`.
+Open the local URL printed by Streamlit, select **Start Camera**, and grant
+camera permission in the browser. Camera access requires HTTPS in production;
+`localhost` is allowed for local development.
 
-Create the database by running `database_schema.sql` in MySQL Workbench or with the MySQL command-line client from PowerShell:
+The first camera start loads `yolov8n.pt` once. The webcam stream remains
+continuous, while inference is capped at 7 frames per second by default. Frames
+are reduced to a maximum 640-pixel side before inference and YOLO uses a 416
+image size on CPU. Adjust `INFERENCE_FPS`, `INFERENCE_MAX_SIDE`, and
+`INFERENCE_IMAGE_SIZE` in local environment variables or Streamlit secrets if
+needed.
 
-```powershell
-Get-Content .\database_schema.sql | mysql -u root -p
-```
+## Streamlit Community Cloud
 
-The application creates the `detection_logs` table and its indexes if they are missing. Start the Streamlit dashboard:
+Deploy the repository using `main.py` as the app entry point. Add MySQL
+connection values as Community Cloud app secrets (`DB_HOST`, `DB_USER`,
+`DB_PASSWORD`, `DB_NAME`, and `DB_PORT`); never commit credentials or upload a
+real `.env` file. `vision_platform.detection_logs` is created when the app
+connects if it does not already exist. Keep `LOG_COOLDOWN=2.0` or higher to
+limit each object class to at most one insert per cooldown interval.
 
-```powershell
-python -m streamlit run main.py
-```
+The camera video is negotiated from the browser using WebRTC and processed on
+the Streamlit server. Networks that block direct WebRTC traffic may require a
+TURN relay. If needed, provide `TURN_SERVER_URLS` (comma-separated URLs),
+`TURN_SERVER_USERNAME`, and `TURN_SERVER_CREDENTIAL` through Streamlit secrets.
+Use TURN credentials intended for client-side WebRTC use. The app must not
+report the camera as connected until WebRTC is playing and frames are arriving.
 
-The dashboard requests the browser's webcam and starts continuous YOLO detection. Allow camera access when prompted. Use **Stop Camera** in the sidebar to stop the stream and **Start Camera** to resume it. Frames continue to display when no objects are detected. The YOLO model configured by `MODEL_PATH` is downloaded by Ultralytics the first time if it is not already present.
+## Modules
 
-The Streamlit dashboard uses WebRTC because a cloud server cannot access a webcam attached to your computer. Video is streamed from the browser to the app over WebRTC; YOLO inference and MySQL logging run on the app server. Do not use `cv2.VideoCapture(0)` for a deployed dashboard.
+- `main.py` coordinates Streamlit, the browser video stream, and UI state.
+- `detector.py` loads and runs the cached YOLO nano model.
+- `database.py` manages MySQL and queues detection events away from video
+  processing.
+- `ui.py` contains the Streamlit controls and history display.
+- `config.py` reads environment variables and Streamlit secrets.
+- `live_detection.py` is an optional local OpenCV-camera command-line utility;
+  it is not used by the deployed Streamlit app.
 
-## Deploy to Streamlit Community Cloud
-
-1. Push this repository to GitHub.
-2. In [Streamlit Community Cloud](https://share.streamlit.io/), create an app from this repository, select the `main` branch, and set the app file to `main.py`.
-3. Configure the app's Python version as **3.11** in its advanced settings.
-4. If using MySQL, add the following keys in the app's **Settings → Secrets**. Use a MySQL server reachable from the cloud app; `localhost` refers to the cloud container, not your computer.
-
-   ```toml
-   DB_HOST = "your-mysql-host"
-   DB_USER = "your-mysql-user"
-   DB_PASSWORD = "your-mysql-password"
-   DB_NAME = "vision_platform"
-   DB_PORT = "3306"
-   ```
-
-   Detection still runs when MySQL is unavailable. Keep credentials in Streamlit Secrets, not in source files or GitHub.
-5. Open the deployed HTTPS URL and allow webcam access in the browser. If the network blocks WebRTC traffic, try another network that permits browser camera streaming.
-
-The repository's `.gitignore` excludes `.env` and downloaded YOLO weights. Ultralytics downloads the configured model when the app first starts.
-
-The included `requirements.txt` uses headless OpenCV for cloud hosting. To use the optional local `live_detection.py` window, install desktop OpenCV in the local environment instead:
-
-```powershell
-python -m pip uninstall -y opencv-python-headless
-python -m pip install opencv-python
-```
-
-To run the standalone OpenCV window instead:
-
-```powershell
-python live_detection.py --camera 0 --confidence 0.70 --object "All Objects"
-```
-
-Press `q` in the OpenCV window to stop. The webcam is released when the script exits.
-
-## Configuration
-
-Copy `.env.example` to `.env` and set the values for your machine:
-
-| Variable | Purpose | Default |
-| --- | --- | --- |
-| `DB_HOST` | MySQL host | `localhost` |
-| `DB_USER` | MySQL user | `root` |
-| `DB_PASSWORD` | MySQL password | empty |
-| `DB_NAME` | Database name | `vision_platform` |
-| `DB_PORT` | MySQL port | `3306` |
-| `MODEL_PATH` | Ultralytics model path/name | `yolov8n.pt` |
-| `DEFAULT_CONFIDENCE` | Initial confidence threshold | `0.70` |
-| `LOG_COOLDOWN` | Minimum seconds between logged events of the same class | `2.0` |
-
-## Project layout
-
-- `main.py` — Streamlit dashboard and live processing
-- `detector.py` — YOLO inference wrapper
-- `database.py` — MySQL connection and event queries
-- `ui.py` — Reusable dashboard components
-- `config.py` — Environment-backed application settings
-- `live_detection.py` — Standalone OpenCV webcam application
-- `database_schema.sql` — Database and detection table schema
+The existing Next.js files in `app/`, `components/`, and the root package
+configuration are retained, but the Streamlit Community Cloud deployment uses
+`main.py` and `requirements.txt`.

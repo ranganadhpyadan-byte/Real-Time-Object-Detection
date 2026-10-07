@@ -9,7 +9,12 @@ from ultralytics import YOLO
 
 class ObjectDetector:
 
-    def __init__(self, model_path="yolov8n.pt", confidence=0.70):
+    def __init__(
+        self,
+        model_path="yolov8n.pt",
+        confidence=0.70,
+        image_size=416,
+    ):
         """
         Initialize YOLO object detector.
 
@@ -20,6 +25,7 @@ class ObjectDetector:
 
         self.model = YOLO(model_path)
         self.confidence = confidence
+        self.image_size = image_size
         self._inference_lock = threading.Lock()
 
     # -----------------------------------------------------
@@ -42,9 +48,12 @@ class ObjectDetector:
         )
         with self._inference_lock:
             results = self.model(
-                frame,
+                source=frame,
                 conf=confidence_threshold,
-                verbose=False
+                imgsz=self.image_size,
+                max_det=30,
+                device="cpu",
+                verbose=False,
             )
 
         # Process YOLO results

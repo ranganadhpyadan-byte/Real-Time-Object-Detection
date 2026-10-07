@@ -213,7 +213,7 @@ def show_sidebar():
     st.sidebar.divider()
 
     if "camera_running" not in st.session_state:
-        st.session_state.camera_running = True
+        st.session_state.camera_running = False
 
     start_col, stop_col = st.sidebar.columns(2)
     with start_col:
@@ -235,8 +235,8 @@ def show_sidebar():
             st.session_state.camera_running = False
 
     st.sidebar.caption(
-        "Allow browser camera access when prompted. Video is processed continuously "
-        "on the server while the camera is running."
+        "The browser provides the webcam through WebRTC. YOLO analyzes selected "
+        "frames while the outgoing video remains continuous."
     )
 
     return confidence_threshold, object_filter, st.session_state.camera_running
