@@ -187,7 +187,6 @@ def show_sidebar():
     Returns:
         confidence_threshold
         object_filter
-        start_camera
     """
 
     st.sidebar.markdown("## ⚙️ Controls")
@@ -224,7 +223,6 @@ def show_sidebar():
             type="primary",
             width="stretch",
             disabled=st.session_state.camera_running,
-            help="Open the webcam and start continuous live detection.",
         ):
             st.session_state.camera_running = True
     with stop_col:
@@ -233,20 +231,15 @@ def show_sidebar():
             key="stop_camera_button",
             width="stretch",
             disabled=not st.session_state.camera_running,
-            help="Stop detection and release the webcam.",
         ):
             st.session_state.camera_running = False
 
     st.sidebar.caption(
-        "Camera frames are processed locally. MySQL event history is available "
-        "when the configured database is reachable."
+        "Allow browser camera access when prompted. Video is processed continuously "
+        "on the server while the camera is running."
     )
 
-    return (
-        confidence_threshold,
-        object_filter,
-        st.session_state.camera_running,
-    )
+    return confidence_threshold, object_filter, st.session_state.camera_running
 
 
 # ---------------------------------------------------------
@@ -254,14 +247,11 @@ def show_sidebar():
 # ---------------------------------------------------------
 def create_video_area():
     """
-    Create placeholder for live camera feed.
+    Add the heading for the live browser camera feed.
     """
 
     st.subheader("LIVE CAMERA FOOTAGE")
-
-    video_placeholder = st.empty()
-
-    return video_placeholder
+    st.caption("🎥 YOLO detections are drawn directly on the continuous live video.")
 
 
 # ---------------------------------------------------------

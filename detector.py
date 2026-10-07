@@ -2,6 +2,8 @@
 # YOLO Object Detection Module
 # Assignment 5 - Real-Time Object Detection & Logging Platform
 
+import threading
+
 from ultralytics import YOLO
 
 
@@ -18,11 +20,12 @@ class ObjectDetector:
 
         self.model = YOLO(model_path)
         self.confidence = confidence
+        self._inference_lock = threading.Lock()
 
     # -----------------------------------------------------
     # DETECT OBJECTS
     # -----------------------------------------------------
-    def detect(self, frame):
+    def detect(self, frame, confidence=None):
         """
         Detect objects in a single video frame.
 
@@ -34,11 +37,15 @@ class ObjectDetector:
         detections = []
 
         # Run YOLO prediction
-        results = self.model(
-            frame,
-            conf=self.confidence,
-            verbose=False
+        confidence_threshold = (
+            self.confidence if confidence is None else confidence
         )
+        with self._inference_lock:
+            results = self.model(
+                frame,
+                conf=confidence_threshold,
+                verbose=False
+            )
 
         # Process YOLO results
         for result in results:

@@ -3,13 +3,26 @@
 # Assignment 5 - Real-Time Object Detection & Logging Platform
 
 import os
+
+import streamlit as st
 from dotenv import load_dotenv
+from streamlit.errors import StreamlitSecretNotFoundError
 
 
 # ---------------------------------------------------------
 # LOAD .ENV FILE
 # ---------------------------------------------------------
 load_dotenv()
+
+
+def _setting(name, default):
+    if name in os.environ:
+        return os.environ[name]
+
+    try:
+        return st.secrets.get(name, default)
+    except StreamlitSecretNotFoundError:
+        return default
 
 
 # =========================================================
@@ -26,14 +39,14 @@ APP_ICON = "🤖"
 # =========================================================
 
 # YOLO model
-MODEL_PATH = os.getenv(
+MODEL_PATH = _setting(
     "MODEL_PATH",
     "yolov8n.pt"
 )
 
 # Default confidence threshold
 DEFAULT_CONFIDENCE = float(
-    os.getenv(
+    _setting(
         "DEFAULT_CONFIDENCE",
         "0.70"
     )
@@ -55,7 +68,7 @@ CONFIDENCE_STEP = 0.05
 
 # Default webcam index
 CAMERA_INDEX = int(
-    os.getenv(
+    _setting(
         "CAMERA_INDEX",
         "0"
     )
@@ -63,7 +76,7 @@ CAMERA_INDEX = int(
 
 # Camera frame width
 FRAME_WIDTH = int(
-    os.getenv(
+    _setting(
         "FRAME_WIDTH",
         "640"
     )
@@ -71,7 +84,7 @@ FRAME_WIDTH = int(
 
 # Camera frame height
 FRAME_HEIGHT = int(
-    os.getenv(
+    _setting(
         "FRAME_HEIGHT",
         "480"
     )
@@ -100,28 +113,28 @@ OBJECT_CLASSES = [
 # DATABASE SETTINGS
 # =========================================================
 
-DB_HOST = os.getenv(
+DB_HOST = _setting(
     "DB_HOST",
     "localhost"
 )
 
-DB_USER = os.getenv(
+DB_USER = _setting(
     "DB_USER",
     "root"
 )
 
-DB_PASSWORD = os.getenv(
+DB_PASSWORD = _setting(
     "DB_PASSWORD",
     ""
 )
 
-DB_NAME = os.getenv(
+DB_NAME = _setting(
     "DB_NAME",
     "vision_platform"
 )
 
 DB_PORT = int(
-    os.getenv(
+    _setting(
         "DB_PORT",
         "3306"
     )
@@ -141,7 +154,7 @@ DB_TABLE = "detection_logs"
 
 # Number of recent records shown in UI
 RECENT_LOG_LIMIT = int(
-    os.getenv(
+    _setting(
         "RECENT_LOG_LIMIT",
         "20"
     )
@@ -166,7 +179,7 @@ PAGE_LAYOUT = "wide"
 # with hundreds of identical records per second.
 
 LOG_COOLDOWN = float(
-    os.getenv(
+    _setting(
         "LOG_COOLDOWN",
         "2.0"
     )
