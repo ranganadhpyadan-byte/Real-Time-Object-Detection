@@ -4,7 +4,9 @@
 
 import threading
 
+import torch
 from ultralytics import YOLO
+from ultralytics.utils import torch_utils
 
 
 class ObjectDetector:
@@ -23,6 +25,9 @@ class ObjectDetector:
             confidence: Minimum confidence threshold
         """
 
+        # Ultralytics resets PyTorch to NUM_THREADS when it selects the CPU.
+        torch_utils.NUM_THREADS = 1
+        torch.set_num_threads(1)
         self.model = YOLO(model_path)
         self.confidence = confidence
         self.image_size = image_size

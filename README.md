@@ -24,9 +24,10 @@ camera permission in the browser. Camera access requires HTTPS in production;
 The first camera start loads `yolov8n.pt` once. The webcam stream remains
 continuous, while inference is capped at 7 frames per second by default. Frames
 are reduced to a maximum 640-pixel side before inference and YOLO uses a 416
-image size on CPU. Adjust `INFERENCE_FPS`, `INFERENCE_MAX_SIDE`, and
-`INFERENCE_IMAGE_SIZE` in local environment variables or Streamlit secrets if
-needed.
+image size on CPU. PyTorch's CPU thread count is limited to one to avoid
+Ultralytics resetting it to all available host threads on each prediction.
+Adjust `INFERENCE_FPS`, `INFERENCE_MAX_SIDE`, and `INFERENCE_IMAGE_SIZE` in
+local environment variables or Streamlit secrets if needed.
 
 ## Streamlit Community Cloud
 

@@ -33,7 +33,6 @@ class LiveDetectionProcessor(VideoProcessorBase):
         self._last_inference_at = 0.0
         self._last_error_log_at = 0.0
         self._detections = []
-        self._detection_error = False
         self._settings_generation = 0
         self._inference_future = None
         self._inference_generation = None
@@ -60,7 +59,6 @@ class LiveDetectionProcessor(VideoProcessorBase):
         self._inference_executor.shutdown(wait=False, cancel_futures=True)
 
     def recv(self, frame):
-        image = frame.to_ndarray(format="bgr24")
         now = time.monotonic()
         self.last_frame_at = now
         with self._settings_lock:
@@ -82,22 +80,22 @@ class LiveDetectionProcessor(VideoProcessorBase):
                     detections = completed_future.result()
                     with self._settings_lock:
                         self._detections = detections
-                        self._detection_error = False
                     fresh_detections = True
                 except Exception:
                     with self._settings_lock:
                         self._detections = []
-                        self._detection_error = True
                     if now - self._last_error_log_at >= 30:
                         logger.exception(
                             "YOLO inference failed; live video continues."
                         )
                         self._last_error_log_at = now
 
+        image = None
         if (
             self._inference_future is None
             and now - self._last_inference_at >= 1.0 / INFERENCE_FPS
         ):
+            image = frame.to_ndarray(format="bgr24")
             frame_height, frame_width = image.shape[:2]
             scale = min(
                 1.0,
@@ -113,7 +111,7 @@ class LiveDetectionProcessor(VideoProcessorBase):
                     interpolation=cv2.INTER_AREA,
                 )
             else:
-                inference_frame = image.copy()
+                inference_frame = image
 
             self._inference_future = self._inference_executor.submit(
                 self._detect_and_scale,
@@ -127,7 +125,6 @@ class LiveDetectionProcessor(VideoProcessorBase):
 
         with self._settings_lock:
             detections = tuple(self._detections)
-            detection_error = self._detection_error
 
         accepted = []
         for detection in detections:
@@ -139,6 +136,18 @@ class LiveDetectionProcessor(VideoProcessorBase):
                 continue
 
             accepted.append(detection)
+            if fresh_detections:
+                self._log_detection(detection)
+
+        if not accepted:
+            return frame
+
+        if image is None:
+            image = frame.to_ndarray(format="bgr24")
+        else:
+            image = image.copy()
+
+        for detection in accepted:
             x, y = detection["x"], detection["y"]
             width, height = detection["w"], detection["h"]
             cv2.rectangle(
@@ -150,35 +159,13 @@ class LiveDetectionProcessor(VideoProcessorBase):
             )
             cv2.putText(
                 image,
-                f"{object_class}: {confidence * 100:.1f}%",
+                f'{detection["class"]}: {detection["confidence"] * 100:.1f}%',
                 (x, max(y - 10, 20)),
                 cv2.FONT_HERSHEY_SIMPLEX,
                 0.6,
                 (0, 255, 0),
                 2,
             )
-            if fresh_detections:
-                self._log_detection(detection)
-
-        if detection_error:
-            status = "LIVE VIDEO · DETECTION ERROR · SEE SERVER LOGS"
-        else:
-            status = (
-                f"LIVE VIDEO · {len(accepted)} DETECTION(S)"
-                if accepted
-                else "LIVE VIDEO · NO MATCHING OBJECTS"
-            )
-        cv2.rectangle(image, (0, 0), (image.shape[1], 38), (15, 23, 42), -1)
-        cv2.putText(
-            image,
-            status,
-            (14, 25),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            0.58,
-            (255, 255, 255),
-            2,
-            cv2.LINE_AA,
-        )
         return av.VideoFrame.from_ndarray(image, format="bgr24")
 
     def _detect_and_scale(

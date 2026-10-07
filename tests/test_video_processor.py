@@ -52,6 +52,7 @@ class LiveDetectionProcessorTests(unittest.TestCase):
 
         self.assertEqual(len(output_frames), 30)
         self.assertTrue(all(isinstance(frame, av.VideoFrame) for frame in output_frames))
+        self.assertTrue(all(frame is self.frame for frame in output_frames))
         self.assertGreaterEqual(len(detector.calls), 5)
         self.assertLessEqual(len(detector.calls), 10)
         self.assertEqual(detector.calls[0][0], (360, 640, 3))
